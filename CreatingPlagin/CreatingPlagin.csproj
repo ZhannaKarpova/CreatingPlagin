@@ -50,6 +50,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Class1.cs" />
+    <Compile Include="CreationModelBase.cs" />
+    <Compile Include="CreationModelBase1.cs" />
     <Compile Include="doc.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="transaction\Commit.cs" />

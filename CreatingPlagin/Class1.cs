@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Autodesk.Revit.ApplicationServices;
 
 namespace CreationModelPlugin
 {
@@ -20,14 +21,98 @@ namespace CreationModelPlugin
             Level level1 = SelectLevel(doc, "Уровень 1");
             Level level2 = SelectLevel(doc, "Уровень 2");
             List<Wall> walls = CreateWalls(level1, level2, doc);
-            AddDoor(doc, level1, walls[0]);
+            AddRoof(doc, level1, walls[0]);
             AddWindow(doc, level1, walls[1]);
             AddWindow(doc, level1, walls[2]);
             AddWindow(doc, level1, walls[3]);
 
             return Result.Succeeded;
         }
-        private void AddWindow(Document doc, Level level1, Wall wall)
+        private Result AddRoof(Document doc, Level level1, Wall wall)
+        {
+           
+            Transaction transaction = new Transaction(doc, "Создание крыши");
+            transaction.Start();
+
+            ElementId id = doc.GetDefaultElementTypeId(ElementTypeGroup.RoofType);
+            RoofType type = doc.GetElement(id) as RoofType;
+            if (type == null)
+            {
+                TaskDialog.Show("Error", "Not RoofType");
+                return Result.Failed;
+            }
+            // Crear esquema
+            CurveArray curveArray = new CurveArray();
+            curveArray.Append(Line.CreateBound(new XYZ(0, 0, 0), new XYZ(0, 20, 20)));
+            curveArray.Append(Line.CreateBound(new XYZ(0, 20, 20), new XYZ(0, 40, 0)));
+            // Obtener la elevación de la vista actual
+            Level level = doc.ActiveView.GenLevel;
+            if (level == null)
+            {
+                TaskDialog.Show("Error", "No es PlainView");
+                return Result.Failed;
+            }
+            // Crear techo
+            using (Transaction tr = new Transaction(doc))
+            {
+                tr.Start("Create ExtrusionRoof");
+                ReferencePlane plane = doc.Create.NewReferencePlane(new XYZ(0, 0, 0), new XYZ(0, 0, 20), new XYZ(0, 20, 0), doc.ActiveView);
+                doc.Create.NewExtrusionRoof(curveArray, plane, level, type, 0, 40);
+                tr.Commit();
+
+
+            }
+            return Result.Succeeded;
+            transaction.Commit();
+        }
+            #region "NewFootPrintRoof"
+            //{
+            // RoofType roofType = new FilteredElementCollector(doc)
+            //     .OfClass(typeof(RoofType))
+            //     .OfType<RoofType>()
+            //     .Where(x => x.Name.Equals("Типовой - 400мм"))
+            //     .Where(x => x.FamilyName.Equals("Базовая крыша"))
+            //     .FirstOrDefault();
+            // Transaction transaction = new Transaction(doc, "Создание крыши");
+            // transaction.Start();
+            // double wallWidth = walls[0].Width;
+            // double dt = wallWidth / 2;
+            // List<XYZ> points = new List<XYZ>();
+            // points.Add(new XYZ(-dt, -dt, 0));
+            // points.Add(new XYZ(dt, -dt, 0));
+            // points.Add(new XYZ(dt, dt, 0));
+            // points.Add(new XYZ(-dt, dt, 0));
+            // points.Add(new XYZ(-dt, -dt, 0));
+            // Application application = doc.Application;
+            // CurveArray footprint = application.Create.NewCurveArray();
+            // for (int i = 0; i < 4; i++)
+            // {
+            //     LocationCurve curve = walls[i].Location as LocationCurve;
+            //     XYZ p1 = curve.Curve.GetEndPoint(0);
+            //     XYZ p2 = curve.Curve.GetEndPoint(1);
+            //     Line line = Line.CreateBound(p1 + points[i], p2 + points[i + 1]);
+            //     footprint.Append(line);
+            // }
+            // ModelCurveArray footPrintToModelCurveMapping = new ModelCurveArray();
+            // FootPrintRoof footprintRoof = doc.Create.NewFootPrintRoof(footprint, level2, roofType, out footPrintToModelCurveMapping);
+
+            // //ModelCurveArrayIterator iterator = footPrintToModelCurveMapping.ForwardIterator();
+            // //iterator.Reset();
+            // //while (iterator.MoveNext())
+            //// {
+            //    // ModelCurve modelCurve = iterator.Current as ModelCurve;
+            //     //footprintRoof.set_DefinesSlope(modelCurve, true);
+            //     //footprintRoof.set_SlopeAngle(modelCurve, 0.5);
+            // //}
+            // foreach(ModelCurve m in footPrintToModelCurveMapping)
+            // {
+            //     footprintRoof.set_DefinesSlope(m, true);
+            //     footprintRoof.set_SlopeAngle(m, 0.5);
+            // }
+            // transaction.Commit();
+            #endregion
+            //}
+            private void AddWindow(Document doc, Level level1, Wall wall)
         {
             FamilySymbol windowType = new FilteredElementCollector(doc)
                 .OfClass(typeof(FamilySymbol))
@@ -50,6 +135,7 @@ namespace CreationModelPlugin
             FamilyInstance window = doc.Create.NewFamilyInstance(point, windowType, wall, level1, StructuralType.NonStructural);
             double offsetHeigh = UnitUtils.ConvertToInternalUnits(500, UnitTypeId.Millimeters);
             window.get_Parameter(BuiltInParameter.INSTANCE_SILL_HEIGHT_PARAM).Set(offsetHeigh);
+
             transaction.Commit();
         }
 
